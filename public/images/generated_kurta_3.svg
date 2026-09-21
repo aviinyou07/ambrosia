@@ -1,0 +1,16 @@
+<svg width="800" height="1200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#800000;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#CD5C5C;stop-opacity:1" />
+      </linearGradient>
+      <pattern id="pat3" width="10" height="10" patternUnits="userSpaceOnUse">
+    <path d="M-1,1 l2,-2 M0,10 l10,-10 M9,11 l2,-2" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+  </pattern>
+    </defs>
+    <rect width="800" height="1200" fill="url(#grad2)" />
+    <rect width="800" height="1200" fill="url(#pat3)" color="#ffffff" />
+    <rect x="200" y="500" width="400" height="200" fill="#ffffff" fill-opacity="0.9" rx="10" />
+    <text x="400" y="590" font-family="serif" font-size="48" fill="#800000" text-anchor="middle" font-weight="bold">KURTA</text>
+    <text x="400" y="640" font-family="sans-serif" font-size="24" fill="#333333" text-anchor="middle" letter-spacing="4">STYLE 3</text>
+  </svg>

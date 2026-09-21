@@ -1,0 +1,14 @@
+<svg width="800" height="1200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="grad4" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#B8860B;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#F0E68C;stop-opacity:1" />
+      </linearGradient>
+      <pattern id="pat5" width="40" height="20" patternUnits="userSpaceOnUse"><path d="M 0 10 Q 10 0 20 10 T 40 10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3"/></pattern>
+    </defs>
+    <rect width="800" height="1200" fill="url(#grad4)" />
+    <rect width="800" height="1200" fill="url(#pat5)" color="#ffffff" />
+    <rect x="200" y="500" width="400" height="200" fill="#ffffff" fill-opacity="0.9" rx="10" />
+    <text x="400" y="590" font-family="serif" font-size="48" fill="#B8860B" text-anchor="middle" font-weight="bold">GOWN</text>
+    <text x="400" y="640" font-family="sans-serif" font-size="24" fill="#333333" text-anchor="middle" letter-spacing="4">STYLE 5</text>
+  </svg>
