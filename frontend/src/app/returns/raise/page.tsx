@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { submitReturn } from '@/lib/apis';
 
 export default function RaiseReturnPage() {
   const [formData, setFormData] = useState({
@@ -17,8 +18,24 @@ export default function RaiseReturnPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.orderId && formData.emailOrPhone) {
-      setReturnRef(`RET-${Math.floor(10000 + Math.random() * 90000)}`);
+      const fallbackRef = `RET-${Math.floor(10000 + Math.random() * 90000)}`;
+      setReturnRef(fallbackRef);
       setSubmitted(true);
+
+      // Async persist to PostgreSQL
+      submitReturn({
+        order_id: formData.orderId,
+        customer_email: formData.emailOrPhone,
+        request_type: formData.requestType,
+        reason: formData.reason,
+        comments: formData.comments,
+      }).then((res) => {
+        if (res.success && res.data?.id) {
+          setReturnRef(res.data.id);
+        }
+      }).catch((err) => {
+        console.warn('Backend return submission skipped (fallback active):', err);
+      });
     }
   };
 

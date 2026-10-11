@@ -2,6 +2,7 @@
 import React, { useState, use } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { getOrderById as getBackendOrder } from '@/lib/apis';
 
 interface OrderTrackingProps {
   searchParams: Promise<{ id?: string }>;
@@ -16,12 +17,40 @@ export default function OrderTrackingPage({ searchParams }: OrderTrackingProps) 
   const [trackedOrder, setTrackedOrder] = useState<any>(initialId ? getOrderById(initialId) : null);
   const [hasSearched, setHasSearched] = useState(!!initialId);
 
-  const handleTrack = (e: React.FormEvent) => {
+  const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!orderInput.trim()) return;
     setHasSearched(true);
+    
+    // Check local state first
     const found = getOrderById(orderInput.trim());
-    setTrackedOrder(found || {
+    if (found) {
+      setTrackedOrder(found);
+      return;
+    }
+
+    // Check backend API
+    try {
+      const res = await getBackendOrder(orderInput.trim().toUpperCase());
+      if (res.success && res.data) {
+        setTrackedOrder({
+          id: res.data.id,
+          date: new Date(res.data.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          status: res.data.status,
+          total: parseFloat(res.data.total),
+          shippingAddress: {
+            fullName: res.data.customer_name,
+            city: res.data.shipping_address?.city || 'India',
+          },
+        });
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Graceful sample fallback
+    setTrackedOrder({
       id: orderInput.trim().toUpperCase(),
       date: 'Recent',
       status: 'Shipped',

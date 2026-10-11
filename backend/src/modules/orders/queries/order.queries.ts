@@ -80,7 +80,7 @@ export const createOrder = async (orderData: any, items: any[]) => {
   try {
     await client.query('BEGIN');
 
-    const orderId = `AVY-${Math.floor(10000 + Math.random() * 90000)}`;
+    const orderId = (orderData as any).id || `AVY-${Math.floor(10000 + Math.random() * 90000)}`;
 
     const insertOrderSql = `
       INSERT INTO orders (

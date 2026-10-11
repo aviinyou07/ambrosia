@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CartItem } from './CartContext';
+import { createOrder as createOrderApi } from '@/lib/apis';
 
 export interface Address {
   id: string;
@@ -164,14 +165,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createOrder = (orderData: Omit<Order, 'id' | 'date' | 'status'>): Order => {
     const randomNum = Math.floor(10000 + Math.random() * 90000);
+    const orderId = `AVY-${randomNum}`;
     const newOrder: Order = {
       ...orderData,
-      id: `AVY-${randomNum}`,
+      id: orderId,
       date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       status: 'Confirmed',
     };
 
     setOrders(prev => [newOrder, ...prev]);
+
+    // Asynchronously persist to backend PostgreSQL
+    createOrderApi({
+      id: orderId,
+      customer_name: orderData.shippingAddress.fullName || user?.name || 'Valued Customer',
+      customer_email: user?.email || 'customer@example.com',
+      customer_phone: orderData.shippingAddress.phone || user?.phone || '+91 98765 00000',
+      shipping_address: {
+        address: orderData.shippingAddress.street,
+        city: orderData.shippingAddress.city,
+        state: orderData.shippingAddress.state,
+        pincode: orderData.shippingAddress.pincode,
+      },
+      subtotal: orderData.subtotal,
+      discount: orderData.discount,
+      shipping_fee: orderData.shippingFee,
+      total: orderData.total,
+      payment_method: orderData.paymentMethod,
+      items: orderData.items.map(it => ({
+        product_title: it.title,
+        product_image: it.image,
+        size: it.size,
+        quantity: it.quantity,
+        unit_price: it.price,
+      })),
+    } as any).catch(err => {
+      console.warn('Backend order persistence skipped (local fallback active):', err);
+    });
+
     return newOrder;
   };
 
