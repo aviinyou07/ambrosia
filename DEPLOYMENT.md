@@ -9,7 +9,7 @@ Three applications, one monorepo, one push to deploy.
 | API        | `backend/`  | `api.ambrosiavastra.com`     | 5000           |
 | Postgres   | —           | internal only                | 5432           |
 
-**Pipeline:** `git push origin main` → GitHub webhook → Coolify pulls, builds the
+**Pipeline:** `git push origin main` → GitHub App push event → Coolify pulls, builds the
 app's Dockerfile, deploys, swaps traffic over. No registry, no GitHub Actions.
 
 ---
@@ -53,8 +53,8 @@ export COOLIFY_TOKEN=<API token with write scope>   # Keys & Tokens -> API token
 export JWT_SECRET=$(openssl rand -base64 48)
 export DB_PASSWORD=$(openssl rand -base64 24)
 # optional — without these the API deploys but media uploads fail
-export R2_ACCESS_KEY_ID=...
-export R2_SECRET_ACCESS_KEY=...
+export S3_ACCESS_KEY_ID=...
+export S3_SECRET_ACCESS_KEY=...
 
 python3 scripts/provision-coolify.py --dry-run   # show the plan, change nothing
 python3 scripts/provision-coolify.py             # apply
@@ -150,7 +150,7 @@ Environment variables — **tick "Build Variable" on both**:
 
 ```
 NEXT_PUBLIC_API_URL=https://api.ambrosiavastra.com/api/v1
-NEXT_PUBLIC_R2_PUBLIC_URL=https://pub-8204a887dc104db5bc9768e902671861.r2.dev
+NEXT_PUBLIC_R2_PUBLIC_URL=https://s3.173.249.2.14.sslip.io/ambrosia
 ```
 
 > ⚠️ **This is the single most common way this deploy goes wrong.**
@@ -195,11 +195,16 @@ DB_SSL=
 # Generate with: openssl rand -base64 48
 JWT_SECRET=<long-random-secret>
 
-R2_ACCOUNT_ID=80cb977372f202bf141deb4906b650d6
-R2_BUCKET_NAME=ambrosia
-R2_PUBLIC_URL=https://pub-8204a887dc104db5bc9768e902671861.r2.dev
-R2_ACCESS_KEY_ID=<from Cloudflare R2>
-R2_SECRET_ACCESS_KEY=<from Cloudflare R2>
+# Object storage: the self-hosted RustFS service in the "Shared services"
+# project. See §8 for how to mint the keys.
+S3_ENDPOINT=https://s3.173.249.2.14.sslip.io
+S3_BUCKET=ambrosia
+S3_PUBLIC_URL=https://s3.173.249.2.14.sslip.io/ambrosia
+S3_FORCE_PATH_STYLE=true
+S3_PUBLIC_READ=true
+S3_ACCESS_KEY_ID=<from the RustFS console>
+S3_SECRET_ACCESS_KEY=<from the RustFS console>
+PUBLIC_API_URL=https://api.ambrosiavastra.com
 
 ALLOWED_ORIGINS=https://ambrosiavastra.com,https://www.ambrosiavastra.com,https://admin.ambrosiavastra.com
 ```
@@ -251,7 +256,7 @@ git commit -m "feat: whatever you changed"
 git push origin main
 ```
 
-GitHub fires the webhook; Coolify rebuilds and redeploys **only the apps whose
+The GitHub App delivers the push event; Coolify rebuilds and redeploys **only the apps whose
 base directory changed** if you enable per-app path filters:
 
 > In each application → **Advanced → Watch Paths**, set
@@ -261,7 +266,7 @@ base directory changed** if you enable per-app path filters:
 > ⚠️ Use `**`, not `*`. Coolify compiles `*` to `[^/]*`, which cannot cross a
 > `/`, so `frontend/*` matches only files directly inside `frontend/` and
 > ignores every nested change — which is almost every real commit. The symptom
-> is silent: GitHub reports the webhook delivered `200 OK` while Coolify replies
+> is silent: the push event is accepted while Coolify replies
 > `"Changed files do not match watch paths. Ignoring deployment."` You can read
 > that reply under GitHub → Settings → Webhooks → Recent Deliveries.
 
@@ -280,6 +285,56 @@ docker compose up --build
 
 ---
 
+## 8. Object storage (RustFS)
+
+Uploads go to the self-hosted **RustFS** service in Coolify's *Shared services*
+project — not Cloudflare R2. RustFS speaks the S3 API, so the backend uses the
+AWS S3 SDK against it; only the endpoint and addressing style differ.
+
+- S3 API: port **9000**, published at `s3`/`media`/`storage.173.249.2.14.sslip.io`
+- Console: port **9001**, *not* exposed by default
+- Path-style addressing is required (`S3_FORCE_PATH_STYLE=true`)
+
+The API logs its storage mode on boot, which is the quickest way to tell whether
+the keys took effect:
+
+```
+🗄️  Storage: s3 -> https://s3.173.249.2.14.sslip.io/ambrosia   # configured
+🗄️  Storage: local-fallback -> ...                             # keys missing
+```
+
+### Minting the keys
+
+1. **Expose the console.** Coolify → *Shared services* → **rustfs** → Domains,
+   add an entry mapped to port 9001, e.g.
+   `https://rustfs-console.173.249.2.14.sslip.io:9001`. Restart the service.
+   Note this service is shared with the `sgarf` project, so restart it at a
+   quiet moment.
+2. **Sign in** with the root credentials, which live on that same service under
+   Environment Variables: `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY`.
+3. **Access Keys → Add Access Key.** Copy the secret immediately — it is shown
+   once. These are service-account keys; applications should use their own
+   rather than the root console credentials.
+4. Set `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` on `ambrosia-api` and redeploy.
+
+Quicker but weaker: paste the root `RUSTFS_ACCESS_KEY`/`RUSTFS_SECRET_KEY`
+directly. It works, but those credentials are shared with `sgarf`.
+
+### Bucket and public reads
+
+On boot the API creates the `ambrosia` bucket if missing and applies an anonymous
+`GetObject` policy, because uploaded images are loaded directly by the browser.
+**Without that policy every image returns 403.**
+
+A narrowly scoped key may not be allowed to create buckets or set policies. The
+API logs a warning and keeps serving rather than crashing, so if you see that
+warning, create the `ambrosia` bucket in the console and grant anonymous read on
+it there.
+
+`next/image` only loads hosts listed in `remotePatterns`, which both Next apps
+derive from `NEXT_PUBLIC_R2_PUBLIC_URL`. Changing the storage host is therefore a
+**rebuild**, not a restart — it is a build-time value.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
@@ -290,4 +345,4 @@ docker compose up --build
 | CORS error in console | Domain missing from `ALLOWED_ORIGINS`. Note `*.ambrosiavastra.com` is already allowed by `backend/src/server.ts`. |
 | SSL certificate won't issue | DNS not resolving to the server yet, or Cloudflare proxy is on. Grey-cloud it, retry. |
 | Build OOM on a small VPS | Next builds are memory-hungry. Add swap: `fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`. |
-| Uploaded files vanish after redeploy | Expected — the container is ephemeral. R2 is the real store; `/app/uploads` is only a fallback. Add a Coolify persistent volume on `/app/uploads` if you rely on it. |
+| Uploaded files vanish after redeploy | `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` are unset, so uploads fall back to the container's `/app/uploads`, which is ephemeral. Check the boot log: `Storage: local-fallback` means RustFS is not in use. Set the keys (§8) and redeploy. |
