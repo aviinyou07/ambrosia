@@ -1,10 +1,23 @@
 # syntax=docker/dockerfile:1
 
 ############################################
-# Stage 1 — install full deps & compile TS
+# Stage 1 — install deps, compile TS, then
+# prune back to production dependencies.
+#
+# A single `npm ci` serves both the build and the runtime tree. An earlier
+# version of this file had separate `builder` and `deps` stages, which BuildKit
+# runs concurrently — two full dependency downloads at once, which is slower and
+# flaky on constrained networks (it failed with ECONNRESET).
 ############################################
 FROM node:22-alpine AS builder
 WORKDIR /app
+
+# Be patient with a flaky registry rather than failing the whole deploy.
+ENV NPM_CONFIG_FETCH_RETRIES=5
+ENV NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
+ENV NPM_CONFIG_AUDIT=false
+ENV NPM_CONFIG_FUND=false
 
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -13,16 +26,11 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-############################################
-# Stage 2 — production dependencies only
-############################################
-FROM node:22-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# Drop devDependencies in place; dist/ is already built.
+RUN npm prune --omit=dev
 
 ############################################
-# Stage 3 — runtime
+# Stage 2 — runtime
 ############################################
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -33,7 +41,7 @@ ENV PORT=5000
 # curl is used by the container healthcheck
 RUN apk add --no-cache curl
 
-COPY --from=deps    /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist         ./dist
 COPY package.json ./
 # SQL files are shipped so migrations can be run from inside the container

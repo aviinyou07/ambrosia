@@ -178,15 +178,14 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
                 # Empty on purpose: Coolify's Postgres is reached over the
                 # private Docker network and serves no TLS.
                 {"key": "DB_SSL", "value": ""},
-                {"key": "JWT_SECRET", "value": jwt_secret, "is_shown_once": True},
+                {"key": "JWT_SECRET", "value": jwt_secret},
                 {"key": "R2_ACCOUNT_ID", "value": R2_ACCOUNT_ID},
                 {"key": "R2_BUCKET_NAME", "value": R2_BUCKET_NAME},
                 {"key": "R2_PUBLIC_URL", "value": R2_PUBLIC_URL},
                 {"key": "R2_ACCESS_KEY_ID",
                  "value": os.environ.get("R2_ACCESS_KEY_ID", "")},
                 {"key": "R2_SECRET_ACCESS_KEY",
-                 "value": os.environ.get("R2_SECRET_ACCESS_KEY", ""),
-                 "is_shown_once": True},
+                 "value": os.environ.get("R2_SECRET_ACCESS_KEY", "")},
                 {"key": "ALLOWED_ORIGINS", "value": ALLOWED_ORIGINS},
             ],
         },

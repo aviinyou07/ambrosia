@@ -5,6 +5,14 @@
 ############################################
 FROM node:22-alpine AS deps
 WORKDIR /app
+
+# Be patient with a flaky registry rather than failing the whole deploy.
+ENV NPM_CONFIG_FETCH_RETRIES=5
+ENV NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000
+ENV NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
+ENV NPM_CONFIG_AUDIT=false
+ENV NPM_CONFIG_FUND=false
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
