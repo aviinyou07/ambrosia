@@ -38,7 +38,41 @@ dig +short ambrosiavastra.com admin.ambrosiavastra.com api.ambrosiavastra.com
 
 ---
 
-## 1. Connect GitHub to Coolify
+## 1. Automated path (recommended)
+
+Everything in sections 2 and 3 can be created in one command by
+`scripts/provision-coolify.py`, which talks to the Coolify REST API. It is
+idempotent — it matches resources by name and reuses them rather than
+duplicating.
+
+```bash
+export COOLIFY_URL=http://173.249.2.14:8000
+export COOLIFY_TOKEN=<API token with write scope>   # Keys & Tokens -> API tokens
+
+# optional — generated and stored in Coolify if omitted
+export JWT_SECRET=$(openssl rand -base64 48)
+export DB_PASSWORD=$(openssl rand -base64 24)
+# optional — without these the API deploys but media uploads fail
+export R2_ACCESS_KEY_ID=...
+export R2_SECRET_ACCESS_KEY=...
+
+python3 scripts/provision-coolify.py --dry-run   # show the plan, change nothing
+python3 scripts/provision-coolify.py             # apply
+```
+
+It creates the Postgres, all three applications with the correct base
+directories, ports, domains, health check, **auto-deploy on**, **watch paths**,
+and every environment variable — including the `NEXT_PUBLIC_*` values marked
+build-time.
+
+The repository is **public**, so no GitHub App install is required.
+
+Sections 2–3 below document the equivalent manual UI steps; do those only if
+you would rather click through it.
+
+---
+
+## 1b. Connect GitHub to Coolify (manual path only)
 
 In Coolify: **Sources → + Add → GitHub App**, install it on
 `aviinyou07/ambrosia`, and grant it read access to the repo.
@@ -107,10 +141,15 @@ NEXT_PUBLIC_R2_PUBLIC_URL=https://pub-8204a887dc104db5bc9768e902671861.r2.dev
 
 > ⚠️ **This is the single most common way this deploy goes wrong.**
 > `NEXT_PUBLIC_*` values are compiled into the browser bundle at *build* time.
-> If you add them as runtime-only variables, the build bakes in `undefined`,
-> and every API call from the browser fails — while the container still starts
-> and reports healthy. Verified: with the build args passed, the API URL appears
-> in `.next/static`; without them, it appears zero times.
+> If they are not available to the build, it bakes in `undefined` and every API
+> call from the browser fails — while the container still starts and reports
+> healthy. Verified locally: with the build args passed, the API URL appears in
+> `.next/static`; without them, it appears **zero** times.
+>
+> In Coolify's API the field is `is_buildtime` (the public API docs omit it) and
+> it defaults to `true`, so variables are usually available to the build. The UI
+> still exposes it as a per-variable toggle, so confirm it is on for both keys.
+> `scripts/provision-coolify.py` sets it explicitly.
 
 ### 3.2 Admin — `admin.ambrosiavastra.com`
 
