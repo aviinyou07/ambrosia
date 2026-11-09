@@ -47,6 +47,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# curl is required by Coolify's container health check, which runs INSIDE the
+# container. node:22-alpine ships neither curl nor a usable wget, so without
+# this the probe fails and Coolify rolls the deployment back.
+RUN apk add --no-cache curl
+
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
 COPY --from=builder /app/public ./public

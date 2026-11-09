@@ -72,7 +72,21 @@ you would rather click through it.
 
 ---
 
-## 1b. Connect GitHub to Coolify (manual path only)
+## 1b. Git source
+
+The three applications use the **`aviinyou` GitHub App** source that was already
+installed on this Coolify instance (the same one the `sgarf` project uses).
+
+That matters for CI/CD: Coolify never polls GitHub, so something has to tell it a
+push happened. With a GitHub App source the App itself delivers push events, so
+**no repository webhook is needed and none should be added** — a manual webhook
+alongside the App would deliver the same push twice and deploy everything twice.
+
+Only if an app is created as a *public repository* source does Coolify lack the
+credentials to register a webhook, in which case you add one manually pointing at
+`/webhooks/source/github/events/manual` with the app's secret.
+
+## 1c. Connect a new GitHub App (only if one is not installed)
 
 In Coolify: **Sources → + Add → GitHub App**, install it on
 `aviinyou07/ambrosia`, and grant it read access to the repo.
