@@ -24,5 +24,6 @@ router.use(authenticateToken, requireAdmin);
 router.post('/upload', upload.single('file'), mediaController.uploadMedia);
 router.get('/presign', mediaController.getPresignedUrl);
 router.get('/list', mediaController.listMedia);
+router.delete('/:key', mediaController.deleteMedia);
 
 export default router;
