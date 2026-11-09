@@ -14,7 +14,9 @@ ENV NPM_CONFIG_AUDIT=false
 ENV NPM_CONFIG_FUND=false
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# --include=dev is required: NODE_ENV=production in the build environment makes
+# `npm ci` skip devDependencies, which holds the Next/Tailwind/TS toolchain.
+RUN npm ci --include=dev
 
 ############################################
 # Stage 2 — build

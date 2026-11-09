@@ -20,7 +20,10 @@ ENV NPM_CONFIG_AUDIT=false
 ENV NPM_CONFIG_FUND=false
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# --include=dev is required: Coolify injects NODE_ENV=production into the build,
+# and `npm ci` silently skips devDependencies when it is set, which left tsc
+# missing ("sh: tsc: not found").
+RUN npm ci --include=dev
 
 COPY tsconfig.json ./
 COPY src ./src
