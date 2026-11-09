@@ -8,9 +8,20 @@ export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'
 ).replace(/\/$/, '');
 
-export const R2_PUBLIC_URL = (
-  process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://pub-8204a887dc104db5bc9768e902671861.r2.dev'
+/**
+ * Public base URL of the object storage (self-hosted RustFS).
+ *
+ * The fallback must stay in step with the storage host that next.config.ts
+ * derives from the same variable: if they disagree, next/image rejects the host
+ * and every image breaks at runtime with no build-time warning. It previously
+ * fell back to a Cloudflare R2 bucket that this deployment no longer uses.
+ */
+export const STORAGE_PUBLIC_URL = (
+  process.env.NEXT_PUBLIC_R2_PUBLIC_URL || 'https://s3.173.249.2.14.sslip.io/ambrosia'
 ).replace(/\/$/, '');
+
+/** @deprecated Use STORAGE_PUBLIC_URL; kept so existing imports keep working. */
+export const R2_PUBLIC_URL = STORAGE_PUBLIC_URL;
 
 /**
  * Get headers including Bearer token if present
