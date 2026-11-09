@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import * as r2Service from '../services/r2.service.js';
+import * as storage from '../services/storage.service.js';
 import { sendSuccess, sendError } from '../../../utils/response.js';
 
 export const uploadMedia = async (req: Request, res: Response) => {
@@ -9,7 +9,7 @@ export const uploadMedia = async (req: Request, res: Response) => {
     }
 
     const { originalname, buffer, mimetype } = req.file;
-    const url = await r2Service.uploadToR2(buffer, originalname, mimetype);
+    const url = await storage.uploadFile(buffer, originalname, mimetype);
 
     return sendSuccess(res, {
       url,
@@ -29,7 +29,7 @@ export const getPresignedUrl = async (req: Request, res: Response) => {
       return sendError(res, 'fileName and contentType query parameters are required', 400);
     }
 
-    const presigned = await r2Service.getR2PresignedUploadUrl(
+    const presigned = await storage.getPresignedUploadUrl(
       String(fileName),
       String(contentType)
     );
@@ -41,7 +41,7 @@ export const getPresignedUrl = async (req: Request, res: Response) => {
 
 export const listMedia = async (_req: Request, res: Response) => {
   try {
-    const files = await r2Service.listR2Files();
+    const files = await storage.listFiles();
     return sendSuccess(res, files);
   } catch (error) {
     return sendError(res, 'Failed to list media files', 500, error);

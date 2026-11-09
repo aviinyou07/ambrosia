@@ -5,6 +5,7 @@ import path from 'path';
 import apiRouter from './routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { pool } from './config/db.js';
+import { ensureBucket, storageInfo } from './modules/media/services/storage.service.js';
 
 dotenv.config();
 
@@ -87,6 +88,10 @@ app.use(errorHandler);
 const server = app.listen(PORT, () => {
   console.log(`🚀 Ambrosia Backend Server listening on http://localhost:${PORT}`);
   console.log(`📡 API Base URL: http://localhost:${PORT}/api/v1`);
+  const s = storageInfo();
+  console.log(`🗄️  Storage: ${s.mode}${s.endpoint ? ` -> ${s.endpoint}/${s.bucket}` : ''}`);
+  // RustFS/MinIO start with no buckets, so create ours before the first upload.
+  void ensureBucket();
 });
 
 // Graceful shutdown

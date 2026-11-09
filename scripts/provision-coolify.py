@@ -43,7 +43,7 @@ import urllib.request
 # `[^/]*`, which cannot cross a `/`, so `frontend/*` matches only files sitting
 # directly in frontend/ and silently ignores every nested change -- i.e. almost
 # every real commit. `**` compiles to `.*` and matches both.
-GIT_REPO = "https://github.com/aviinyou07/ambrosia"
+GIT_REPO = "aviinyou07/ambrosia"
 GIT_BRANCH = "main"
 PROJECT_NAME = "ambrosia"
 ENVIRONMENT = "production"
@@ -51,15 +51,22 @@ DB_NAME_IN_COOLIFY = "ambrosia-db"
 POSTGRES_DB = "ambrosia_db"
 POSTGRES_USER = "postgres"
 
-R2_ACCOUNT_ID = "80cb977372f202bf141deb4906b650d6"
-R2_BUCKET_NAME = "ambrosia"
-R2_PUBLIC_URL = "https://pub-8204a887dc104db5bc9768e902671861.r2.dev"
+# Self-hosted RustFS (S3-compatible) in Coolify's "Shared services" project.
+S3_BUCKET = "ambrosia"
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "https://s3.173.249.2.14.sslip.io")
+S3_PUBLIC_URL = f"{S3_ENDPOINT}/{S3_BUCKET}"
+
+# GitHub App source already installed on this Coolify instance. With an App
+# source Coolify receives push events itself, so no repository webhook is
+# needed -- adding one alongside would deploy every push twice.
+GITHUB_APP_UUID = os.environ.get("GITHUB_APP_UUID", "1htp5jj4wuqgdpeiqarmqumu")
 
 API_DOMAIN = "https://api.ambrosiavastra.com"
 STORE_DOMAINS = "https://ambrosiavastra.com,https://www.ambrosiavastra.com"
 ADMIN_DOMAIN = "https://admin.ambrosiavastra.com"
 
 PUBLIC_API_URL = "https://api.ambrosiavastra.com/api/v1"
+API_ORIGIN = "https://api.ambrosiavastra.com"
 
 ALLOWED_ORIGINS = (
     "https://ambrosiavastra.com,"
@@ -136,6 +143,25 @@ def warn(msg: str) -> None:
 
 # ──────────────────────────── application specs ──────────────────────────────
 
+def web_healthcheck(port: int) -> dict:
+    """Coolify runs the probe INSIDE the container with curl, and the Next
+    images install it for exactly this reason. 127.0.0.1 rather than localhost,
+    so the probe cannot resolve to ::1 while Next listens on IPv4."""
+    return {
+        "health_check_enabled": True,
+        "health_check_path": "/api/health",
+        "health_check_port": str(port),
+        "health_check_host": "127.0.0.1",
+        "health_check_method": "GET",
+        "health_check_return_code": 200,
+        "health_check_scheme": "http",
+        "health_check_interval": 30,
+        "health_check_timeout": 5,
+        "health_check_retries": 3,
+        "health_check_start_period": 45,
+    }
+
+
 def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
     """Each app: Coolify creation payload + the env vars it needs."""
     web_envs = [
@@ -144,7 +170,7 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
         # docs omit it); Coolify defaults it to true, but we are explicit.
         {"key": "NEXT_PUBLIC_API_URL", "value": PUBLIC_API_URL,
          "is_buildtime": True, "is_runtime": True},
-        {"key": "NEXT_PUBLIC_R2_PUBLIC_URL", "value": R2_PUBLIC_URL,
+        {"key": "NEXT_PUBLIC_R2_PUBLIC_URL", "value": S3_PUBLIC_URL,
          "is_buildtime": True, "is_runtime": True},
     ]
 
@@ -183,13 +209,16 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
                 # private Docker network and serves no TLS.
                 {"key": "DB_SSL", "value": ""},
                 {"key": "JWT_SECRET", "value": jwt_secret},
-                {"key": "R2_ACCOUNT_ID", "value": R2_ACCOUNT_ID},
-                {"key": "R2_BUCKET_NAME", "value": R2_BUCKET_NAME},
-                {"key": "R2_PUBLIC_URL", "value": R2_PUBLIC_URL},
-                {"key": "R2_ACCESS_KEY_ID",
-                 "value": os.environ.get("R2_ACCESS_KEY_ID", "")},
-                {"key": "R2_SECRET_ACCESS_KEY",
-                 "value": os.environ.get("R2_SECRET_ACCESS_KEY", "")},
+                {"key": "S3_ENDPOINT", "value": S3_ENDPOINT},
+                {"key": "S3_BUCKET", "value": S3_BUCKET},
+                {"key": "S3_PUBLIC_URL", "value": S3_PUBLIC_URL},
+                {"key": "S3_FORCE_PATH_STYLE", "value": "true"},
+                {"key": "S3_PUBLIC_READ", "value": "true"},
+                {"key": "S3_ACCESS_KEY_ID",
+                 "value": os.environ.get("S3_ACCESS_KEY_ID", "")},
+                {"key": "S3_SECRET_ACCESS_KEY",
+                 "value": os.environ.get("S3_SECRET_ACCESS_KEY", "")},
+                {"key": "PUBLIC_API_URL", "value": API_ORIGIN},
                 {"key": "ALLOWED_ORIGINS", "value": ALLOWED_ORIGINS},
             ],
         },
@@ -208,6 +237,7 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
                 "watch_paths": "frontend/**",
                 "is_auto_deploy_enabled": True,
                 "is_force_https_enabled": True,
+                **web_healthcheck(3000),
             },
             "envs": web_envs,
         },
@@ -226,6 +256,7 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
                 "watch_paths": "admin/**",
                 "is_auto_deploy_enabled": True,
                 "is_force_https_enabled": True,
+                **web_healthcheck(3001),
             },
             "envs": web_envs,
         },
@@ -364,9 +395,10 @@ def main() -> int:
                 "project_uuid": project_uuid,
                 "server_uuid": server_uuid,
                 "environment_name": env_name,
+                "github_app_uuid": GITHUB_APP_UUID,
                 **spec["create"],
             }
-            app = cf.post("/applications/public", payload)
+            app = cf.post("/applications/private-github-app", payload)
             app_uuid = app.get("uuid", "?")
             ok(f"created ({app_uuid})")
             info(f"base_directory={spec['create']['base_directory']}  "
