@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "db:schema": "node dist/scripts/migrate.js --schema --i-know-this-drops-tables",
+    "db:seed": "node dist/scripts/migrate.js --seed"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",

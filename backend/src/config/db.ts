@@ -8,11 +8,31 @@ const { Pool } = pg;
 const isProduction = process.env.NODE_ENV === 'production';
 const connectionString = process.env.DATABASE_URL;
 
+/**
+ * TLS is opt-in via DB_SSL.
+ *
+ *   DB_SSL unset / "false" / "disable"  -> no explicit ssl option. For a
+ *     DATABASE_URL, `pg` then honours any `sslmode=` in the URL itself.
+ *     This is the right default for a Coolify-managed Postgres, which is
+ *     reached over the private Docker network and serves no TLS.
+ *   DB_SSL "true" / "require"           -> TLS without CA verification,
+ *     which is what hosted providers (Neon, Supabase, RDS) expect.
+ *   DB_SSL "verify"                     -> TLS with full CA verification.
+ */
+const sslSetting = (process.env.DB_SSL || '').trim().toLowerCase();
+
+const sslOption: pg.PoolConfig['ssl'] =
+  sslSetting === 'verify'
+    ? { rejectUnauthorized: true }
+    : sslSetting === 'true' || sslSetting === 'require'
+      ? { rejectUnauthorized: false }
+      : undefined;
+
 export const pool = new Pool(
   connectionString
     ? {
         connectionString,
-        ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false },
+        ...(sslOption ? { ssl: sslOption } : {}),
         max: 20,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 5000,
@@ -23,6 +43,7 @@ export const pool = new Pool(
         database: process.env.DB_NAME || 'ambrosia_db',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || undefined,
+        ...(sslOption ? { ssl: sslOption } : {}),
         max: 20,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 5000,
