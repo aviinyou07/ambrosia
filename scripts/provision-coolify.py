@@ -39,6 +39,10 @@ import sys
 import urllib.error
 import urllib.request
 
+# Watch paths must use `**`, not `*`. Coolify's globToRegex compiles `*` to
+# `[^/]*`, which cannot cross a `/`, so `frontend/*` matches only files sitting
+# directly in frontend/ and silently ignores every nested change -- i.e. almost
+# every real commit. `**` compiles to `.*` and matches both.
 GIT_REPO = "https://github.com/aviinyou07/ambrosia"
 GIT_BRANCH = "main"
 PROJECT_NAME = "ambrosia"
@@ -157,7 +161,7 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
                 "dockerfile_location": "/Dockerfile",
                 "ports_exposes": "5000",
                 "domains": API_DOMAIN,
-                "watch_paths": "backend/*",
+                "watch_paths": "backend/**",
                 "is_auto_deploy_enabled": True,
                 "is_force_https_enabled": True,
                 "health_check_enabled": True,
@@ -201,7 +205,7 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
                 "dockerfile_location": "/Dockerfile",
                 "ports_exposes": "3000",
                 "domains": STORE_DOMAINS,
-                "watch_paths": "frontend/*",
+                "watch_paths": "frontend/**",
                 "is_auto_deploy_enabled": True,
                 "is_force_https_enabled": True,
             },
@@ -219,7 +223,7 @@ def app_specs(db_url: str, jwt_secret: str) -> list[dict]:
                 "dockerfile_location": "/Dockerfile",
                 "ports_exposes": "3001",
                 "domains": ADMIN_DOMAIN,
-                "watch_paths": "admin/*",
+                "watch_paths": "admin/**",
                 "is_auto_deploy_enabled": True,
                 "is_force_https_enabled": True,
             },

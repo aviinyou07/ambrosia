@@ -241,8 +241,15 @@ GitHub fires the webhook; Coolify rebuilds and redeploys **only the apps whose
 base directory changed** if you enable per-app path filters:
 
 > In each application → **Advanced → Watch Paths**, set
-> `frontend/*` / `admin/*` / `backend/*` respectively. Without this, every push
-> rebuilds all three apps — correct, just slower.
+> `frontend/**` / `admin/**` / `backend/**` respectively. Without this, every
+> push rebuilds all three apps — correct, just slower.
+>
+> ⚠️ Use `**`, not `*`. Coolify compiles `*` to `[^/]*`, which cannot cross a
+> `/`, so `frontend/*` matches only files directly inside `frontend/` and
+> ignores every nested change — which is almost every real commit. The symptom
+> is silent: GitHub reports the webhook delivered `200 OK` while Coolify replies
+> `"Changed files do not match watch paths. Ignoring deployment."` You can read
+> that reply under GitHub → Settings → Webhooks → Recent Deliveries.
 
 Rollback: **Deployments** tab → pick a previous successful deployment → **Rollback**.
 
